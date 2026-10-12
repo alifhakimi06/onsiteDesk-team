@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OnsiteDesk - Technician Sign In</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-gray-800 min-h-screen flex items-center justify-center p-4">
+
+  <div class="max-w-md w-full bg-white p-6 md:p-8 rounded-xl shadow-lg border border-gray-200">
+    <!-- Header -->
+    <div class="text-center mb-6">
+      <span class="px-2.5 py-1 text-[11px] font-bold tracking-wider text-emerald-800 bg-emerald-100 rounded-full uppercase">
+        Onsite Team Portal
+      </span>
+      <h1 id="formTitle" class="text-2xl font-bold text-gray-900 mt-2">Technician Sign In</h1>
+      <p id="formSubtitle" class="text-sm text-gray-500 mt-1">Manage your availability and assigned tasks</p>
+    </div>
+
+    <!-- Toggle Sign In / Sign Up -->
+    <div class="flex bg-gray-100 rounded-lg p-1 mb-6">
+      <button type="button" onclick="toggleAuthMode('signin')" id="tabSignIn"
+        class="w-1/2 py-2 text-sm font-semibold rounded-md bg-white text-gray-900 shadow-sm transition">
+        Sign In
+      </button>
+      <button type="button" onclick="toggleAuthMode('signup')" id="tabSignUp"
+        class="w-1/2 py-2 text-sm font-semibold rounded-md text-gray-500 hover:text-gray-900 transition">
+        Register Tech
+      </button>
+    </div>
+
+    <!-- Alert Box -->
+    <div id="alertBox" class="hidden mb-4 p-3 rounded-lg text-xs font-medium"></div>
+
+    <!-- ================= SIGN IN FORM ================= -->
+    <form id="signInForm" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number</label>
+        <input type="tel" id="loginPhone" required placeholder="60123456789"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+        <input type="password" id="loginPassword" required placeholder="••••••••"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+      </div>
+      <button type="submit" id="signInBtn"
+        class="w-full bg-emerald-800 hover:bg-emerald-900 text-white font-semibold py-2.5 rounded-lg transition shadow-sm">
+        Sign In to Portal
+      </button>
+    </form>
+
+    <!-- ================= SIGN UP FORM ================= -->
+    <form id="signUpForm" class="hidden space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Technician Name</label>
+        <input type="text" id="regName" required placeholder="e.g. Zul / Amir"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        <span class="text-[11px] text-gray-400">This name will appear on the QM Leader's assignment list</span>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number</label>
+        <input type="tel" id="regPhone" required placeholder="60123456789"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        <span class="text-[11px] text-gray-400">QM Leader will send task alerts to this WhatsApp number</span>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Primary Specialty</label>
+        <select id="regSkill"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+          <option value="All-Rounder (Hardware & Software)">All-Rounder (Hardware & Software)</option>
+          <option value="Hardware & PC Specialist">Hardware & PC Specialist</option>
+          <option value="Software & Network">Software & Network</option>
+          <option value="Stock & Logistics">Stock & Field Support</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Create Password</label>
+        <input type="password" id="regPassword" required placeholder="••••••••"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+      </div>
+      <button type="submit" id="signUpBtn"
+        class="w-full bg-emerald-800 hover:bg-emerald-900 text-white font-semibold py-2.5 rounded-lg transition shadow-sm">
+        Register & Sync to QM
+      </button>
+    </form>
+  </div>
+
+  <script>
+    const DB_URLS = [
+      "https://onsitedesk-3833b-default-rtdb.asia-southeast1.firebasedatabase.app",
+      "https://onsitedesk-3833b-default-rtdb.firebaseio.com"
+    ];
+    let activeDbUrl = localStorage.getItem("firebaseActiveUrl") || DB_URLS[0];
+
+    window.onload = () => {
+      if (localStorage.getItem("techSession")) {
+        window.location.href = "tech.html";
+      }
+    };
+
+    async function dbFetch(path, options = {}) {
+      for (const baseUrl of [activeDbUrl, ...DB_URLS]) {
+        try {
+          const res = await fetch(`${baseUrl}${path}`, options);
+          if (res.ok) {
+            activeDbUrl = baseUrl;
+            localStorage.setItem("firebaseActiveUrl", baseUrl);
+            return await res.json();
+          }
+        } catch (e) {}
+      }
+      throw new Error("Cannot connect to Firebase. Ensure Realtime Database Rules are in Test Mode.");
+    }
+
+    function formatPhone(phone) {
+      let cleaned = phone.replace(/\D/g, '');
+      if (cleaned.startsWith('0')) cleaned = '6' + cleaned;
+      else if (!cleaned.startsWith('60')) cleaned = '60' + cleaned;
+      return cleaned;
+    }
+
+    function showAlert(message, isError = true) {
+      const box = document.getElementById("alertBox");
+      box.className = `mb-4 p-3 rounded-lg text-xs font-medium border ${
+        isError ? "bg-red-50 text-red-700 border-red-200" : "bg-emerald-50 text-emerald-800 border-emerald-200"
+      }`;
+      box.innerText = message;
+      box.classList.remove("hidden");
+    }
+
+    function toggleAuthMode(mode) {
+      const isSignIn = (mode === 'signin');
+      document.getElementById("signInForm").classList.toggle("hidden", !isSignIn);
+      document.getElementById("signUpForm").classList.toggle("hidden", isSignIn);
+      document.getElementById("alertBox").classList.add("hidden");
+
+      document.getElementById("formTitle").innerText = isSignIn ? "Technician Sign In" : "Register Onsite Member";
+      document.getElementById("formSubtitle").innerText = isSignIn ? "Manage your availability and assigned tasks" : "Your profile will automatically sync to QM Dashboard";
+
+      document.getElementById("tabSignIn").className = isSignIn
+        ? "w-1/2 py-2 text-sm font-semibold rounded-md bg-white text-gray-900 shadow-sm transition"
+        : "w-1/2 py-2 text-sm font-semibold rounded-md text-gray-500 hover:text-gray-900 transition";
+      document.getElementById("tabSignUp").className = !isSignIn
+        ? "w-1/2 py-2 text-sm font-semibold rounded-md bg-white text-gray-900 shadow-sm transition"
+        : "w-1/2 py-2 text-sm font-semibold rounded-md text-gray-500 hover:text-gray-900 transition";
+    }
+
+    // Handle Sign Up -> Saves directly into /onsiteTeam in Firebase so QM sees them immediately!
+    document.getElementById("signUpForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+      const btn = document.getElementById("signUpBtn");
+      btn.innerText = "Registering...";
+      btn.disabled = true;
+
+      const name = document.getElementById("regName").value.trim();
+      const phone = formatPhone(document.getElementById("regPhone").value.trim());
+      const skill = document.getElementById("regSkill").value;
+      const password = document.getElementById("regPassword").value;
+
+      try {
+        const existingTech = await dbFetch(`/onsiteTeam/${phone}.json`);
+        if (existingTech) {
+          showAlert("This WhatsApp number is already registered in the Onsite Team. Please Sign In.", true);
+          btn.innerText = "Register & Sync to QM";
+          btn.disabled = false;
+          return;
+        }
+
+        const newTech = {
+          name,
+          phone,
+          skill,
+          password,
+          availability: "Available",
+          statusNote: "Ready for task",
+          completedToday: 0,
+          lastUpdated: Date.now()
+        };
+
+        await dbFetch(`/onsiteTeam/${phone}.json`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newTech)
+        });
+
+        localStorage.setItem("techSession", JSON.stringify(newTech));
+        window.location.href = "tech.html";
+      } catch (err) {
+        showAlert(err.message, true);
+        btn.innerText = "Register & Sync to QM";
+        btn.disabled = false;
+      }
+    });
+
+    // Handle Sign In
+    document.getElementById("signInForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+      const btn = document.getElementById("signInBtn");
+      btn.innerText = "Signing in...";
+      btn.disabled = true;
+
+      const phone = formatPhone(document.getElementById("loginPhone").value.trim());
+      const password = document.getElementById("loginPassword").value;
+
+      try {
+        const foundTech = await dbFetch(`/onsiteTeam/${phone}.json`);
+        if (!foundTech || foundTech.password !== password) {
+          showAlert("Invalid WhatsApp number or password.", true);
+          btn.innerText = "Sign In to Portal";
+          btn.disabled = false;
+          return;
+        }
+
+        localStorage.setItem("techSession", JSON.stringify(foundTech));
+        window.location.href = "tech.html";
+      } catch (err) {
+        showAlert(err.message, true);
+        btn.innerText = "Sign In to Portal";
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
