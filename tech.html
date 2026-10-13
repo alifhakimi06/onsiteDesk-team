@@ -283,6 +283,7 @@
             <div>
               <p class="text-sm font-bold text-emerald-900">${t.type} ${t.subCategory ? `(${t.subCategory})` : ''}</p>
               <p class="text-sm text-gray-800 bg-gray-50 p-3 rounded-lg border mt-1.5">${t.details}</p>
+              ${t.imageUrl ? `<a href="${t.imageUrl}" target="_blank" class="inline-block mt-2 text-xs font-bold text-blue-600 underline bg-blue-50 px-2 py-1 rounded border border-blue-200">🖼️ View Attached Image</a>` : ""}
               ${t.resolutionNote ? `<p class="text-xs text-emerald-800 bg-emerald-50 p-2 rounded mt-1.5">✅ <b>Resolution Note:</b> ${t.resolutionNote}</p>` : ''}
             </div>
 
