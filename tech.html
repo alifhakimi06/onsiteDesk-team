@@ -85,6 +85,13 @@
       await syncWorkspace(); setInterval(syncWorkspace, 4000);
     };
 
+    // Fungsi semak adakah nama Tech ni ada dalam senarai assignedTo (sebab sekarang boleh ada 2-3 nama)
+    function isMyTask(t) {
+      if (!t.assignedTo || t.assignedTo === "UNASSIGNED") return false;
+      const assignedArray = t.assignedTo.split(',').map(s => s.trim().toLowerCase());
+      return assignedArray.includes(currentTech.name.toLowerCase());
+    }
+
     async function syncWorkspace() {
       try {
         const ticketsData = await dbFetch(`/tickets.json`);
@@ -94,7 +101,7 @@
     }
 
     function updateAutoStatus() {
-      const activeTasks = allTickets.filter(t => t.assignedTo && t.assignedTo.toLowerCase() === currentTech.name.toLowerCase() && t.status === "In progress").length;
+      const activeTasks = allTickets.filter(t => isMyTask(t) && t.status === "In progress").length;
       const pill = document.getElementById("autoStatusPill");
       if (activeTasks > 0) {
         pill.className = "text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-800 border border-red-200"; pill.innerText = "🔴 BUSY (On Task)";
@@ -112,10 +119,9 @@
     }
 
     function renderTasks() {
-      const myName = currentTech.name.toLowerCase();
-      const myTasks = allTickets.filter(t => t.assignedTo && t.assignedTo.toLowerCase() === myName && t.status === "In progress").sort((a, b) => (priorityRank[a.urgency] || 99) - (priorityRank[b.urgency] || 99));
+      const myTasks = allTickets.filter(t => isMyTask(t) && t.status === "In progress").sort((a, b) => (priorityRank[a.urgency] || 99) - (priorityRank[b.urgency] || 99));
       const poolTasks = allTickets.filter(t => (!t.assignedTo || t.assignedTo === "UNASSIGNED") && t.status === "New").sort((a, b) => (priorityRank[a.urgency] || 99) - (priorityRank[b.urgency] || 99));
-      const doneTasks = allTickets.filter(t => t.assignedTo && t.assignedTo.toLowerCase() === myName && (t.status === "Resolved" || t.status === "Completed")).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      const doneTasks = allTickets.filter(t => isMyTask(t) && (t.status === "Resolved" || t.status === "Completed")).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
       document.getElementById("countMy").innerText = myTasks.length;
       document.getElementById("countPool").innerText = poolTasks.length;
@@ -159,6 +165,7 @@
               <div class="text-[10px] text-gray-400 mt-2 flex flex-col gap-0.5">
                 <span>Created: ${t.createdAt}</span>
                 ${t.resolvedAt && t.resolvedAt !== "-" ? `<span>Resolved: ${t.resolvedAt}</span>` : ""}
+                <span class="mt-1 font-semibold text-gray-500">Working Team: ${t.assignedTo}</span>
               </div>
             </div>
 
@@ -183,10 +190,20 @@
       }).join("");
     }
 
+    // Jika Tech tekan "Claim", tambah nama dia dalam senarai
     async function selfClaimTask(ticketId) {
+      const t = allTickets.find(x => x.id === ticketId);
+      let assignedList = (t.assignedTo && t.assignedTo !== "UNASSIGNED") ? t.assignedTo.split(',').map(s=>s.trim()) : [];
+      let phoneList = (t.assignedPhone && t.assignedPhone !== "") ? t.assignedPhone.toString().split(',').map(s=>s.trim()) : [];
+
+      if (!assignedList.includes(currentTech.name)) {
+        assignedList.push(currentTech.name);
+        phoneList.push(currentTech.phone);
+      }
+
       await Promise.all([
-        dbFetch(`/tickets/${ticketId}/assignedTo.json`, { method: "PUT", body: JSON.stringify(currentTech.name) }),
-        dbFetch(`/tickets/${ticketId}/assignedPhone.json`, { method: "PUT", body: JSON.stringify(currentTech.phone) }),
+        dbFetch(`/tickets/${ticketId}/assignedTo.json`, { method: "PUT", body: JSON.stringify(assignedList.join(', ')) }),
+        dbFetch(`/tickets/${ticketId}/assignedPhone.json`, { method: "PUT", body: JSON.stringify(phoneList.join(', ')) }),
         dbFetch(`/tickets/${ticketId}/status.json`, { method: "PUT", body: JSON.stringify("In progress") })
       ]);
       switchTab('my'); syncWorkspace();
@@ -217,7 +234,6 @@
         } catch(e) { alert("Image upload failed. Saving text note only."); }
       }
 
-      // MASA RESOLVE TANPA SAAT
       const now = new Date();
       const resolvedTime = now.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
       
