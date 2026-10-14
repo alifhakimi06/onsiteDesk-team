@@ -27,13 +27,15 @@
       <p class="text-[11px] text-gray-400 mt-4 border-t pt-3">* Status is updated automatically. 🔴 BUSY (Has active tasks) / 🟢 FREE (No task).</p>
     </div>
 
-    <!-- TABS -->
-    <div class="flex bg-white rounded-xl p-1 shadow-sm border border-gray-200 text-xs sm:text-sm font-semibold">
-      <button onclick="switchTab('my')" id="tabMyBtn" class="w-1/3 py-2 rounded-lg bg-emerald-800 text-white transition">🎯 My Tasks (<span id="countMy">0</span>)</button>
-      <button onclick="switchTab('pool')" id="tabPoolBtn" class="w-1/3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 transition">📥 Open Queue (<span id="countPool">0</span>)</button>
-      <button onclick="switchTab('done')" id="tabDoneBtn" class="w-1/3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 transition">✅ History (<span id="countDone">0</span>)</button>
+    <!-- TABS BARU (DENGAN TAB 'TEAM STATUS') -->
+    <div class="flex bg-white rounded-xl p-1 shadow-sm border border-gray-200 text-[11px] sm:text-xs font-semibold overflow-x-auto hide-scrollbar">
+      <button onclick="switchTab('my')" id="tabMyBtn" class="flex-1 py-2 rounded-lg bg-emerald-800 text-white transition whitespace-nowrap px-2">🎯 My Tasks (<span id="countMy">0</span>)</button>
+      <button onclick="switchTab('team')" id="tabTeamBtn" class="flex-1 py-2 rounded-lg text-gray-600 hover:bg-gray-50 transition whitespace-nowrap px-2">👥 Team Status (<span id="countTeam">0</span>)</button>
+      <button onclick="switchTab('pool')" id="tabPoolBtn" class="flex-1 py-2 rounded-lg text-gray-600 hover:bg-gray-50 transition whitespace-nowrap px-2">📥 Queue (<span id="countPool">0</span>)</button>
+      <button onclick="switchTab('done')" id="tabDoneBtn" class="flex-1 py-2 rounded-lg text-gray-600 hover:bg-gray-50 transition whitespace-nowrap px-2">✅ History (<span id="countDone">0</span>)</button>
     </div>
 
+    <!-- TASKS / TEAM CONTAINER -->
     <div id="tasksContainer" class="space-y-3"></div>
   </div>
 
@@ -61,6 +63,11 @@
     </div>
   </div>
 
+  <style>
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+
   <script>
     const IMGBB_API_KEY = "90877a376ae59e92d6e47c3f1df562ae";
     const DB_URLS = ["https://onsitedesk-3833b-default-rtdb.asia-southeast1.firebasedatabase.app", "https://onsitedesk-3833b-default-rtdb.firebaseio.com"];
@@ -72,7 +79,7 @@
       } throw new Error("Database error.");
     }
 
-    let currentTech = null; let allTickets = []; let activeTab = "my"; let activeResolveTicketId = null; 
+    let currentTech = null; let allTickets = []; let onsiteTeam = []; let activeTab = "my"; let activeResolveTicketId = null; 
     const priorityRank = { "Urgent": 1, "Medium": 2, "Low": 3 };
 
     window.onload = async () => {
@@ -85,7 +92,6 @@
       await syncWorkspace(); setInterval(syncWorkspace, 4000);
     };
 
-    // Fungsi semak adakah nama Tech ni ada dalam senarai assignedTo (sebab sekarang boleh ada 2-3 nama)
     function isMyTask(t) {
       if (!t.assignedTo || t.assignedTo === "UNASSIGNED") return false;
       const assignedArray = t.assignedTo.split(',').map(s => s.trim().toLowerCase());
@@ -94,8 +100,15 @@
 
     async function syncWorkspace() {
       try {
-        const ticketsData = await dbFetch(`/tickets.json`);
+        const [ticketsData, teamData] = await Promise.all([dbFetch(`/tickets.json`), dbFetch(`/onsiteTeam.json`)]);
         allTickets = ticketsData ? Object.values(ticketsData) : [];
+        
+        let rawTeam = teamData ? Object.values(teamData) : [];
+        onsiteTeam = rawTeam.map(tech => {
+          tech.activeTasks = allTickets.filter(t => t.assignedTo && t.assignedTo.split(',').map(s=>s.trim()).includes(tech.name) && t.status === "In progress").length;
+          tech.isBusy = tech.activeTasks > 0; return tech;
+        }).sort((a, b) => (a.isBusy === b.isBusy ? 0 : a.isBusy ? 1 : -1));
+
         renderTasks(); updateAutoStatus(); 
       } catch (e) {}
     }
@@ -112,13 +125,18 @@
 
     function switchTab(tab) {
       activeTab = tab;
-      document.getElementById("tabMyBtn").className = tab === 'my' ? "w-1/3 py-2 rounded-lg bg-emerald-800 text-white transition" : "w-1/3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 transition";
-      document.getElementById("tabPoolBtn").className = tab === 'pool' ? "w-1/3 py-2 rounded-lg bg-emerald-800 text-white transition" : "w-1/3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 transition";
-      document.getElementById("tabDoneBtn").className = tab === 'done' ? "w-1/3 py-2 rounded-lg bg-emerald-800 text-white transition" : "w-1/3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 transition";
+      const inactiveClass = "flex-1 py-2 rounded-lg text-gray-600 hover:bg-gray-50 transition whitespace-nowrap px-2";
+      const activeClass = "flex-1 py-2 rounded-lg bg-emerald-800 text-white transition whitespace-nowrap px-2";
+      
+      document.getElementById("tabMyBtn").className = tab === 'my' ? activeClass : inactiveClass;
+      document.getElementById("tabTeamBtn").className = tab === 'team' ? activeClass : inactiveClass;
+      document.getElementById("tabPoolBtn").className = tab === 'pool' ? activeClass : inactiveClass;
+      document.getElementById("tabDoneBtn").className = tab === 'done' ? activeClass : inactiveClass;
       renderTasks();
     }
 
     function renderTasks() {
+      const myName = currentTech.name.toLowerCase();
       const myTasks = allTickets.filter(t => isMyTask(t) && t.status === "In progress").sort((a, b) => (priorityRank[a.urgency] || 99) - (priorityRank[b.urgency] || 99));
       const poolTasks = allTickets.filter(t => (!t.assignedTo || t.assignedTo === "UNASSIGNED") && t.status === "New").sort((a, b) => (priorityRank[a.urgency] || 99) - (priorityRank[b.urgency] || 99));
       const doneTasks = allTickets.filter(t => isMyTask(t) && (t.status === "Resolved" || t.status === "Completed")).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
@@ -126,8 +144,32 @@
       document.getElementById("countMy").innerText = myTasks.length;
       document.getElementById("countPool").innerText = poolTasks.length;
       document.getElementById("countDone").innerText = doneTasks.length;
+      document.getElementById("countTeam").innerText = onsiteTeam.length;
 
       const container = document.getElementById("tasksContainer");
+
+      if (activeTab === "team") {
+        if (onsiteTeam.length === 0) return container.innerHTML = `<div class="bg-white p-8 rounded-xl border text-center text-sm text-gray-400">No other technicians found.</div>`;
+        
+        container.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">` + onsiteTeam.map((tech) => {
+          const isMe = tech.name.toLowerCase() === myName;
+          const cardStyle = !tech.isBusy ? "bg-emerald-50 border-emerald-300 text-emerald-900" : "bg-red-50 border-red-300 text-red-900";
+          return `
+            <div class="p-4 rounded-xl border ${cardStyle} flex justify-between items-start text-xs shadow-sm">
+              <div>
+                <div class="flex items-center gap-1.5"><span class="font-bold text-sm">${!tech.isBusy ? "🟢" : "🔴"} ${tech.name}</span> ${isMe ? `<span class="text-[10px] bg-gray-800 text-white px-1.5 py-0.5 rounded ml-1">You</span>` : ""}</div>
+                <p class="text-[11px] mt-1.5 font-medium">${!tech.isBusy ? "Currently Free" : `Working on ${tech.activeTasks} task(s)`}</p>
+              </div>
+              <div class="flex flex-col items-end gap-2">
+                <span class="font-bold uppercase text-[10px] px-2 py-1 rounded bg-white border">${!tech.isBusy ? "AVAILABLE" : "BUSY"}</span>
+                ${!isMe ? `<a href="https://wa.me/${tech.phone}" target="_blank" class="text-[11px] underline font-bold">💬 Chat</a>` : ""}
+              </div>
+            </div>
+          `;
+        }).join("") + `</div>`;
+        return;
+      }
+
       const list = activeTab === "my" ? myTasks : activeTab === "pool" ? poolTasks : doneTasks;
 
       if (list.length === 0) return container.innerHTML = `<div class="bg-white p-8 rounded-xl border text-center text-sm text-gray-400">No tickets found in this tab.</div>`;
@@ -190,7 +232,6 @@
       }).join("");
     }
 
-    // Jika Tech tekan "Claim", tambah nama dia dalam senarai
     async function selfClaimTask(ticketId) {
       const t = allTickets.find(x => x.id === ticketId);
       let assignedList = (t.assignedTo && t.assignedTo !== "UNASSIGNED") ? t.assignedTo.split(',').map(s=>s.trim()) : [];
