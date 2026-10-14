@@ -155,7 +155,7 @@
                   <p class="text-xs text-emerald-800">✅ <b>Note:</b> ${t.resolutionNote}</p>${t.proofImageUrl ? `<a href="${t.proofImageUrl}" target="_blank" class="inline-flex items-center mt-1 text-[11px] font-bold text-emerald-700 bg-white px-2 py-1 rounded border border-emerald-200">✅ Proof Image</a>` : ""}
                 </div>
               ` : ''}
-              
+
               <div class="text-[10px] text-gray-400 mt-2 flex flex-col gap-0.5">
                 <span>Created: ${t.createdAt}</span>
                 ${t.resolvedAt && t.resolvedAt !== "-" ? `<span>Resolved: ${t.resolvedAt}</span>` : ""}
@@ -217,6 +217,7 @@
         } catch(e) { alert("Image upload failed. Saving text note only."); }
       }
 
+      // MASA RESOLVE TANPA SAAT
       const now = new Date();
       const resolvedTime = now.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
       
@@ -231,7 +232,7 @@
       await Promise.all(updates); syncWorkspace(); closeResolveModal();
       btn.innerText = "✅ Submit Proof"; btn.disabled = false;
 
-      const waText = `✅ *TASK COMPLETED [#${ticketId}]*\nHi ${ticket.name}, your request has been resolved by ${currentTech.name}!\n\n🛠️ *Note:* ${noteInput}\n${proofUrl ? `🖼️ *Proof:* ${proofUrl}\n` : ""}Thank you.`;
+      const waText = `✅ *TASK RESOLVED [#${ticketId}]*\nHi ${ticket.name}, your request has been resolved by ${currentTech.name}!\n\n🛠️ *Note:* ${noteInput}\n${proofUrl ? `🖼️ *Proof:* ${proofUrl}\n` : ""}Thank you.`;
       window.open(`https://wa.me/${ticket.phone}?text=${encodeURIComponent(waText)}`, "_blank");
     }
     function signOut() { localStorage.removeItem("techSession"); window.location.href = "index.html"; }
